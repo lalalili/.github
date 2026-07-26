@@ -22,6 +22,12 @@ on:
           預設 [""] 表示不釘,直接用套件自己宣告的約束解析。
         type: string
         default: '[""]'
+      matrix-exclude:
+        description: >-
+          要從矩陣排除的組合(JSON 陣列字串),例如
+          '[{"php":"8.2","laravel":"13.*"}]'
+        type: string
+        default: '[]'
       php-extensions:
         description: 'setup-php 要裝的擴充套件'
         type: string
@@ -61,6 +67,7 @@ jobs:
       matrix:
         php: ${{ fromJSON(inputs.php-versions) }}
         laravel: ${{ fromJSON(inputs.laravel-versions) }}
+        exclude: ${{ fromJSON(inputs.matrix-exclude) }}
 
     steps:
       - uses: actions/checkout@v4

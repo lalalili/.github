@@ -28,6 +28,7 @@ jobs:
 |---|---|---|
 | `php-versions` | `['8.3','8.4']` | PHP 版本矩陣 |
 | `laravel-versions` | `[""]` | 要釘住的 `laravel/framework` 版本；`[""]` 表示不釘 |
+| `matrix-exclude` | `[]` | 要排除的矩陣組合，例：`'[{"php":"8.2","laravel":"13.*"}]'` |
 | `php-extensions` | `dom, mbstring, pdo_sqlite, zip` | setup-php 擴充套件 |
 | `run-validate` | `true` | 執行 `composer validate --strict` |
 | `run-test` | `true` | 執行 `composer test`；純工具型套件可關掉 |
