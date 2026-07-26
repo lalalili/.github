@@ -30,6 +30,10 @@ on:
         description: '是否執行 composer validate --strict'
         type: boolean
         default: true
+      run-test:
+        description: '是否執行 composer test。純工具型套件(例如只提供基底類別)可關掉'
+        type: boolean
+        default: true
       run-analyse:
         description: '是否執行 composer analyse(PHPStan)'
         type: boolean
@@ -100,6 +104,7 @@ jobs:
         run: composer validate --strict --no-check-publish
 
       - name: Tests
+        if: inputs.run-test
         run: composer test
 
       - name: Static analysis

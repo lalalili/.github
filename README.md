@@ -30,6 +30,7 @@ jobs:
 | `laravel-versions` | `[""]` | 要釘住的 `laravel/framework` 版本；`[""]` 表示不釘 |
 | `php-extensions` | `dom, mbstring, pdo_sqlite, zip` | setup-php 擴充套件 |
 | `run-validate` | `true` | 執行 `composer validate --strict` |
+| `run-test` | `true` | 執行 `composer test`；純工具型套件可關掉 |
 | `run-analyse` | `true` | 執行 `composer analyse` |
 | `composer-flags` | `--prefer-dist` | 傳給 `composer update` 的額外參數 |
 
