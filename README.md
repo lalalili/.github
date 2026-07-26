@@ -1,6 +1,9 @@
 # lalalili/.github
 
-組織層級的共用設定：可重用的 GitHub Actions workflow、Renovate 預設、語意化版本契約。
+`lalalili/*` 套件共用的設定：可重用的 GitHub Actions workflow、Renovate 預設、語意化版本契約。
+
+- [PACKAGES.md](PACKAGES.md) — 套件索引，接新宿主前先看這份
+- [SEMVER.md](SEMVER.md) — public API 邊界與發版相依順序
 
 ## 可重用 workflow
 
@@ -62,9 +65,18 @@ jobs:
 `audience-core`、`marketing-automation`、`package-testing-support` 是私有 repo。
 依賴它們的套件，其 CI 需要能讀取私有 repo 的 token。
 
-在組織層設定 secret **`COMPOSER_TOKEN`**（Settings → Secrets and variables →
-Actions → New organization secret，範圍給 lalalili 的 repo），caller workflow
-寫 `secrets: inherit` 即可自動帶入。只依賴公開套件的 repo 不設也能跑。
+`lalalili` 是個人帳號而非組織，沒有組織層 secret，因此需要在**每個 repo**
+各自設定 secret `COMPOSER_TOKEN`：
+
+```bash
+gh secret set COMPOSER_TOKEN -R lalalili/<repo> --body "<token>"
+```
+
+caller workflow 寫 `secrets: inherit` 即可帶入。只依賴公開套件的 repo 不設也能跑。
+
+> 更省事的作法是把這三個套件改為 public —— 它們已經是 MIT 授權，
+> `package-testing-support` 更只是一個 Testbench 基底類別。改公開後
+> 整個生態的 CI 都不需要任何 token。
 
 ## Renovate
 
