@@ -1,0 +1,57 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "lalalili/* 套件與宿主共用的 Renovate 預設。各 repo 用 \"extends\": [\"github>lalalili/.github\"] 繼承。",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":dependencyDashboard"
+  ],
+  "timezone": "Asia/Taipei",
+  "schedule": ["before 6am on monday"],
+  "prConcurrentLimit": 5,
+  "packageRules": [
+    {
+      "description": "lalalili 自有套件即時跟進,不排隊",
+      "matchPackagePatterns": ["^lalalili/"],
+      "schedule": ["at any time"],
+      "prPriority": 10,
+      "groupName": "lalalili packages"
+    },
+    {
+      "description": "Laravel 生態一起升,避免 framework 與周邊版本錯開",
+      "matchPackagePatterns": [
+        "^laravel/",
+        "^illuminate/",
+        "^filament/",
+        "^livewire/",
+        "^spatie/laravel-"
+      ],
+      "groupName": "laravel ecosystem"
+    },
+    {
+      "description": "開發工具合併成一個 PR",
+      "matchDepTypes": ["require-dev", "devDependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "dev tooling"
+    },
+    {
+      "description": "GitHub Actions 一起升",
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions"
+    },
+    {
+      "description": "major 升級需要人工判斷,不自動合併",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "schedule": ["at any time"],
+    "prPriority": 20
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on the first day of the month"]
+  }
+}

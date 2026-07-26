@@ -1,0 +1,107 @@
+name: PHP Package CI
+
+# lalalili/* PHP 套件共用的 CI。各套件 repo 只需要一個三行的 caller workflow:
+#
+#   jobs:
+#     ci:
+#       uses: lalalili/.github/.github/workflows/php-package-ci.yml@main
+#       secrets: inherit
+#
+# 需要調整矩陣或關掉靜態分析時,用下面的 inputs 覆寫。
+
+on:
+  workflow_call:
+    inputs:
+      php-versions:
+        description: 'PHP 版本矩陣(JSON 陣列字串)'
+        type: string
+        default: "['8.3','8.4']"
+      laravel-versions:
+        description: >-
+          要釘住的 laravel/framework 版本矩陣(JSON 陣列字串)。
+          預設 [""] 表示不釘,直接用套件自己宣告的約束解析。
+        type: string
+        default: '[""]'
+      php-extensions:
+        description: 'setup-php 要裝的擴充套件'
+        type: string
+        default: 'dom, mbstring, pdo_sqlite, zip'
+      run-validate:
+        description: '是否執行 composer validate --strict'
+        type: boolean
+        default: true
+      run-analyse:
+        description: '是否執行 composer analyse(PHPStan)'
+        type: boolean
+        default: true
+      composer-flags:
+        description: '傳給 composer update 的額外參數'
+        type: string
+        default: '--prefer-dist'
+    secrets:
+      composer-token:
+        description: >-
+          存取 lalalili 私有套件(audience-core、marketing-automation、
+          package-testing-support)用的 GitHub token。只依賴公開套件的 repo 可以不給。
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: php${{ matrix.php }}${{ matrix.laravel && format(' laravel{0}', matrix.laravel) || '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ${{ fromJSON(inputs.php-versions) }}
+        laravel: ${{ fromJSON(inputs.laravel-versions) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: ${{ inputs.php-extensions }}
+          coverage: none
+
+      # 私有 lalalili 套件要透過 VCS 抓,沒有權杖會在解析階段就 403。
+      # 只依賴公開套件的 repo 不會設這個 secret,這一步會自動跳過。
+      - name: Configure Composer auth
+        env:
+          COMPOSER_TOKEN: ${{ secrets.composer-token }}
+        run: |
+          if [ -n "$COMPOSER_TOKEN" ]; then
+            composer config --global github-oauth.github.com "$COMPOSER_TOKEN"
+            echo "已設定私有套件存取權杖"
+          else
+            echo "未提供 composer-token,僅能解析公開套件"
+          fi
+
+      - name: Pin Laravel version
+        if: matrix.laravel != ''
+        run: >-
+          composer require "laravel/framework:${{ matrix.laravel }}"
+          --no-interaction --no-update
+
+      - name: Install dependencies
+        run: >-
+          composer update ${{ inputs.composer-flags }}
+          --no-interaction --no-progress
+        env:
+          COMPOSER_PROCESS_TIMEOUT: '0'
+          COMPOSER_NO_AUDIT: '1'
+
+      - name: Validate composer.json
+        if: inputs.run-validate
+        run: composer validate --strict --no-check-publish
+
+      - name: Tests
+        run: composer test
+
+      - name: Static analysis
+        if: inputs.run-analyse
+        run: composer analyse

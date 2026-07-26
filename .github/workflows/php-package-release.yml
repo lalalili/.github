@@ -1,0 +1,76 @@
+name: PHP Package Release
+
+# lalalili/* PHP 套件共用的發版流程。各套件 repo 的 caller:
+#
+#   on:
+#     push:
+#       tags: ['v*']
+#   jobs:
+#     release:
+#       uses: lalalili/.github/.github/workflows/php-package-release.yml@main
+#       secrets: inherit
+#
+# 先跑完測試與靜態分析才會建立 GitHub Release,避免發出壞掉的 tag。
+
+on:
+  workflow_call:
+    inputs:
+      php-version:
+        description: '發版驗證使用的 PHP 版本'
+        type: string
+        default: '8.4'
+      php-extensions:
+        type: string
+        default: 'dom, mbstring, pdo_sqlite, zip'
+      run-analyse:
+        type: boolean
+        default: true
+    secrets:
+      composer-token:
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php-version }}
+          extensions: ${{ inputs.php-extensions }}
+          coverage: none
+
+      - name: Configure Composer auth
+        env:
+          COMPOSER_TOKEN: ${{ secrets.composer-token }}
+        run: |
+          if [ -n "$COMPOSER_TOKEN" ]; then
+            composer config --global github-oauth.github.com "$COMPOSER_TOKEN"
+          fi
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+        env:
+          COMPOSER_PROCESS_TIMEOUT: '0'
+          COMPOSER_NO_AUDIT: '1'
+
+      - name: Validate composer.json
+        run: composer validate --strict --no-check-publish
+
+      - name: Tests
+        run: composer test
+
+      - name: Static analysis
+        if: inputs.run-analyse
+        run: composer analyse
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true

@@ -1,0 +1,68 @@
+name: JS Package CI
+
+# lalalili/* 前端套件(builder-ui-core、filament-upload-center)共用的 CI。
+#
+#   jobs:
+#     ci:
+#       uses: lalalili/.github/.github/workflows/js-package-ci.yml@main
+
+on:
+  workflow_call:
+    inputs:
+      node-versions:
+        description: 'Node 版本矩陣(JSON 陣列字串)'
+        type: string
+        default: "['22']"
+      package-manager:
+        description: 'pnpm 或 npm'
+        type: string
+        default: 'pnpm'
+      run-build:
+        description: '是否執行 build script'
+        type: boolean
+        default: true
+      run-test:
+        description: '是否執行 test script'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: node${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ${{ fromJSON(inputs.node-versions) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        if: inputs.package-manager == 'pnpm'
+        uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: ${{ inputs.package-manager }}
+
+      - name: Install dependencies
+        run: |
+          if [ "${{ inputs.package-manager }}" = "pnpm" ]; then
+            pnpm install --frozen-lockfile
+          else
+            npm ci
+          fi
+
+      # 有些套件沒有 test / build script,用 --if-present 避免誤判失敗
+      - name: Tests
+        if: inputs.run-test
+        run: ${{ inputs.package-manager }} run --if-present test
+
+      - name: Build
+        if: inputs.run-build
+        run: ${{ inputs.package-manager }} run --if-present build
