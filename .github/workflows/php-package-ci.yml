@@ -69,6 +69,24 @@ jobs:
         laravel: ${{ fromJSON(inputs.laravel-versions) }}
         exclude: ${{ fromJSON(inputs.matrix-exclude) }}
 
+    # GitHub Actions 的 services 無法用條件式省略,所以一律提供 Redis。
+    # 用不到的套件只多幾秒啟動時間,換來的是佇列 / 快取相關測試不會
+    # 因為缺少服務而突然紅燈(email-campaign 就需要)。
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: '6379'
+
     steps:
       - uses: actions/checkout@v4
 

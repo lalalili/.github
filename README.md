@@ -64,21 +64,27 @@ jobs:
 
 ## 私有套件存取
 
-`audience-core`、`marketing-automation`、`package-testing-support` 是私有 repo。
-依賴它們的套件，其 CI 需要能讀取私有 repo 的 token。
+**目前全部 `lalalili/*` 套件都是 public，CI 不需要任何 token。**
 
-`lalalili` 是個人帳號而非組織，沒有組織層 secret，因此需要在**每個 repo**
-各自設定 secret `COMPOSER_TOKEN`：
+`audience-core`、`marketing-automation`、`package-testing-support` 原本是私有
+repo，導致依賴它們的 6 個套件無法在 CI 上解析依賴、長期沒有任何自動化測試。
+2026-07-27 起改為 public，問題消失。
+
+若日後有套件需要轉回私有，依賴它的 repo 就得各自設定 secret（`lalalili`
+是個人帳號，沒有組織層 secret 可用）：
 
 ```bash
 gh secret set COMPOSER_TOKEN -R lalalili/<repo> --body "<token>"
 ```
 
-caller workflow 寫 `secrets: inherit` 即可帶入。只依賴公開套件的 repo 不設也能跑。
+reusable workflow 已經支援 `composer-token` secret，caller 寫
+`secrets: inherit` 即可帶入。
 
-> 更省事的作法是把這三個套件改為 public —— 它們已經是 MIT 授權，
-> `package-testing-support` 更只是一個 Testbench 基底類別。改公開後
-> 整個生態的 CI 都不需要任何 token。
+## 服務容器
+
+`php-package-ci` 與 `php-package-release` 一律提供 Redis（`REDIS_HOST=127.0.0.1`）。
+GitHub Actions 的 `services` 無法用條件式省略，統一提供的成本只有幾秒啟動時間，
+換來佇列／快取相關測試不會因為缺少服務而紅燈。
 
 ## Renovate
 
