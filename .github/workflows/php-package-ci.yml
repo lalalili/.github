@@ -5,7 +5,11 @@ name: PHP Package CI
 #   jobs:
 #     ci:
 #       uses: lalalili/.github/.github/workflows/php-package-ci.yml@main
-#       secrets: inherit
+#
+# 依賴私有套件的 caller 另加:
+#
+#   secrets:
+#     composer-token: ${{ secrets.COMPOSER_GITHUB_TOKEN }}
 #
 # 需要調整矩陣或關掉靜態分析時,用下面的 inputs 覆寫。
 
@@ -51,8 +55,8 @@ on:
     secrets:
       composer-token:
         description: >-
-          存取 lalalili 私有套件(audience-core、marketing-automation、
-          package-testing-support)用的 GitHub token。只依賴公開套件的 repo 可以不給。
+          存取 lalalili/marketing-automation 私有套件用的 GitHub token。
+          只依賴公開套件的 repo 可以不給。
         required: false
 
 permissions:
