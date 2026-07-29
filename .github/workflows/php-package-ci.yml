@@ -48,6 +48,14 @@ on:
         description: '是否執行 composer analyse(PHPStan)'
         type: boolean
         default: true
+      run-browser:
+        description: '是否安裝 Playwright Chromium 並執行 composer test:browser'
+        type: boolean
+        default: false
+      node-version:
+        description: 'Browser 測試使用的 Node.js 版本'
+        type: string
+        default: 'lts/*'
       composer-flags:
         description: '傳給 composer update 的額外參數'
         type: string
@@ -135,6 +143,25 @@ jobs:
       - name: Tests
         if: inputs.run-test
         run: composer test
+
+      - name: Setup Node.js
+        if: inputs.run-browser
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+
+      - name: Install Browser dependencies
+        if: inputs.run-browser
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Playwright Chromium
+        if: inputs.run-browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser tests
+        if: inputs.run-browser
+        run: composer test:browser
 
       - name: Static analysis
         if: inputs.run-analyse

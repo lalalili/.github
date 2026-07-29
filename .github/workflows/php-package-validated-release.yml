@@ -1,0 +1,201 @@
+name: PHP Package Validated Release
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: '要建立的 immutable semver tag，例如 v1.2.3'
+        type: string
+        required: true
+      sha:
+        description: '要發布的完整 40 字元 commit SHA，必須等於 workflow dispatch SHA'
+        type: string
+        required: true
+      php-version:
+        description: '發版驗證使用的 PHP 版本'
+        type: string
+        default: '8.4'
+      php-extensions:
+        description: 'setup-php 要安裝的擴充套件'
+        type: string
+        default: 'dom, mbstring, pdo_sqlite, zip'
+      run-validate:
+        description: '是否執行 composer validate --strict'
+        type: boolean
+        default: true
+      run-analyse:
+        description: '是否執行 composer analyse'
+        type: boolean
+        default: true
+      run-browser:
+        description: '是否安裝 Playwright Chromium 並執行 composer test:browser'
+        type: boolean
+        default: false
+      node-version:
+        description: 'Browser 測試使用的 Node.js 版本'
+        type: string
+        default: 'lts/*'
+    secrets:
+      composer-token:
+        required: false
+      satis-dispatch-token:
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: '6379'
+      RELEASE_VERSION: ${{ inputs.version }}
+      RELEASE_SHA: ${{ inputs.sha }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+          fetch-depth: 0
+
+      - name: Validate release target
+        id: target
+        run: |
+          if ! [[ "$RELEASE_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "ERROR: version must match vMAJOR.MINOR.PATCH"
+            exit 1
+          fi
+
+          if ! [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "ERROR: sha must be a full 40-character lowercase commit SHA"
+            exit 1
+          fi
+
+          if [ "$RELEASE_SHA" != "$GITHUB_SHA" ]; then
+            echo "ERROR: release SHA must match the workflow dispatch SHA"
+            exit 1
+          fi
+
+          existing_sha="$(git rev-list -n 1 "$RELEASE_VERSION" 2>/dev/null || true)"
+          if [ -n "$existing_sha" ] && [ "$existing_sha" != "$RELEASE_SHA" ]; then
+            echo "ERROR: immutable tag already points to another commit"
+            exit 1
+          fi
+
+          if [ -n "$existing_sha" ]; then
+            echo "tag-exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag-exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php-version }}
+          extensions: ${{ inputs.php-extensions }}
+          coverage: none
+
+      - name: Configure Composer auth
+        env:
+          COMPOSER_TOKEN: ${{ secrets.composer-token }}
+        run: |
+          if [ -n "$COMPOSER_TOKEN" ]; then
+            composer config --global github-oauth.github.com "$COMPOSER_TOKEN"
+          fi
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+        env:
+          COMPOSER_PROCESS_TIMEOUT: '0'
+          COMPOSER_NO_AUDIT: '1'
+
+      - name: Validate composer.json
+        if: inputs.run-validate
+        run: composer validate --strict --no-check-publish
+
+      - name: Tests
+        run: composer test
+
+      - name: Setup Node.js
+        if: inputs.run-browser
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+
+      - name: Install Browser dependencies
+        if: inputs.run-browser
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Playwright Chromium
+        if: inputs.run-browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser tests
+        if: inputs.run-browser
+        run: composer test:browser
+
+      - name: Static analysis
+        if: inputs.run-analyse
+        run: composer analyse
+
+      - name: Read package name
+        id: package
+        run: |
+          package_name="$(php -r '$composer = json_decode(file_get_contents("composer.json"), true, flags: JSON_THROW_ON_ERROR); echo $composer["name"];')"
+          if ! [[ "$package_name" =~ ^lalalili/[a-z0-9._-]+$ ]]; then
+            echo "ERROR: invalid lalalili package name"
+            exit 1
+          fi
+          echo "name=$package_name" >> "$GITHUB_OUTPUT"
+
+      - name: Create immutable tag
+        if: steps.target.outputs.tag-exists != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$RELEASE_VERSION" "$RELEASE_SHA" -m "Release $RELEASE_VERSION"
+          git push origin "refs/tags/$RELEASE_VERSION"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$RELEASE_VERSION" >/dev/null 2>&1; then
+            echo "GitHub Release already exists; continuing with Satis dispatch"
+          else
+            gh release create "$RELEASE_VERSION" \
+              --verify-tag \
+              --generate-notes \
+              --target "$RELEASE_SHA" \
+              --title "$RELEASE_VERSION"
+          fi
+
+      - name: Trigger Satis index build
+        env:
+          GH_TOKEN: ${{ secrets.satis-dispatch-token }}
+          PACKAGE_NAME: ${{ steps.package.outputs.name }}
+        run: |
+          jq -n \
+            --arg package "$PACKAGE_NAME" \
+            --arg version "$RELEASE_VERSION" \
+            --arg sha "$RELEASE_SHA" \
+            '{event_type:"package-released",client_payload:{package:$package,version:$version,sha:$sha}}' \
+            > /tmp/satis-dispatch.json
+
+          gh api \
+            --method POST \
+            repos/lalalili/satis/dispatches \
+            --input /tmp/satis-dispatch.json
