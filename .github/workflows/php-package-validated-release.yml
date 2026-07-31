@@ -188,6 +188,14 @@ jobs:
           GH_TOKEN: ${{ secrets.satis-dispatch-token }}
           PACKAGE_NAME: ${{ steps.package.outputs.name }}
         run: |
+          # 不存在的 secret 會解析成空字串而非報錯（`required: true` 只檢查呼叫端有傳這個鍵，
+          # 不檢查值非空）。少了這道守衛，gh 只會吐出「請設定 GH_TOKEN」的通用提示 + exit 4，
+          # 看起來像 workflow 寫錯而不是「這個 repo 少設一個 secret」——2026-07-31 為此追查了一輪。
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error title=SATIS_DISPATCH_TOKEN 未設定::tag 與 GitHub Release 已建立，但 Satis 索引沒有更新。請在此 repo 設定一把對 lalalili/satis 有 contents:write 的 PAT：gh secret set SATIS_DISPATCH_TOKEN -R lalalili/<repo>。補上之後可直接 re-run 這個 job（建 tag 與發 Release 的步驟具冪等性）。在那之前索引會由 lalalili/satis 的每小時 cron 自行補上。"
+            exit 1
+          fi
+
           jq -n \
             --arg package "$PACKAGE_NAME" \
             --arg version "$RELEASE_VERSION" \
