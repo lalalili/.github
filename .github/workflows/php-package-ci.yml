@@ -48,6 +48,10 @@ on:
         description: '是否執行 composer analyse(PHPStan)'
         type: boolean
         default: true
+      run-format:
+        description: '是否執行 composer format -- --test(Pint)'
+        type: boolean
+        default: false
       run-browser:
         description: '是否安裝 Playwright Chromium 並執行 composer test:browser'
         type: boolean
@@ -166,3 +170,7 @@ jobs:
       - name: Static analysis
         if: inputs.run-analyse
         run: composer analyse
+
+      - name: Formatting
+        if: inputs.run-format
+        run: composer format -- --test

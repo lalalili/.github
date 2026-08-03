@@ -25,6 +25,10 @@ on:
       run-analyse:
         type: boolean
         default: true
+      run-format:
+        description: '是否執行 composer format -- --test(Pint)'
+        type: boolean
+        default: false
     secrets:
       composer-token:
         required: false
@@ -85,6 +89,10 @@ jobs:
       - name: Static analysis
         if: inputs.run-analyse
         run: composer analyse
+
+      - name: Formatting
+        if: inputs.run-format
+        run: composer format -- --test
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2

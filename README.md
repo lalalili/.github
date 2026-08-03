@@ -33,6 +33,7 @@ jobs:
 | `run-validate` | `true` | 執行 `composer validate --strict` |
 | `run-test` | `true` | 執行 `composer test`；純工具型套件可關掉 |
 | `run-analyse` | `true` | 執行 `composer analyse` |
+| `run-format` | `false` | 執行 `composer format -- --test`；需要套件已提供 Pint |
 | `composer-flags` | `--prefer-dist` | 傳給 `composer update` 的額外參數 |
 
 ### PHP 套件發版
